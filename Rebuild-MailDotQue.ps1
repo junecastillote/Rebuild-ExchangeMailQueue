@@ -370,7 +370,7 @@ if ($qFileSizeBefore -ge $thresholdinGB)
 }
 else
 {
-	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Mail.Que Size is less than $($t_MailQueSizeGB) GB. Exit script... " -ForegroundColor Green
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Mail.Que Size is less than $($thresholdinGB) GB. Exit script... " -ForegroundColor Green
 }
 
 #Invoke Housekeeping---------------------------------------------------------------------------------
