@@ -82,7 +82,11 @@ Param(
 
         #Switch to enable email report
         [Parameter()]
-        [switch]$sendEmail
+        [switch]$sendEmail,
+
+        #Switch to enable email report
+        [Parameter()]
+        [int]$removeOldFiles
 )
 
 $script_root = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
@@ -261,7 +265,7 @@ if ($qFileSizeBefore -ge $thresholdinGB)
 	Do
 	{
 		$service = Get-Service MSExchangeTransport
-		Write-Host (Get-Date) ": 	--> MSExchangeTransport Status $($service.Status)" -ForegroundColor Yellow
+		Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": 	--> MSExchangeTransport Status $($service.Status)" -ForegroundColor Yellow
 	}
 	While ($service.Status -ne 'Paused')
 	
@@ -270,7 +274,7 @@ if ($qFileSizeBefore -ge $thresholdinGB)
 	Do
 	{
 		$qCount = (Get-Queue | Where-Object {$_.Identity -notmatch 'Shadow' -and $_.Identity -notmatch 'Unreachable'}) | Measure-Object MessageCount -Sum
-		Write-Host (Get-Date) ": 	--> Queue Count = $($qCount.Sum)" -ForegroundColor Yellow
+		Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": 	--> Queue Count = $($qCount.Sum)" -ForegroundColor Yellow
 		Start-Sleep 5
 	}
 	While ($qCount.Sum -gt 0)
@@ -281,14 +285,14 @@ if ($qFileSizeBefore -ge $thresholdinGB)
 	Do
 	{
 		$service = Get-Service MSExchangeTransport
-		Write-Host (Get-Date) ": 	--> MSExchangeTransport Status $($service.Status)" -ForegroundColor Yellow
+		Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": 	--> MSExchangeTransport Status $($service.Status)" -ForegroundColor Yellow
 	}
 	While ($service.Status -ne 'Stopped')
 	
 	#Delete Mail.Que files
 	$filesToDelete = Get-ChildItem $mailQDir
 	foreach ($dFile in $filesToDelete) {		
-		Write-Host (Get-Date) ": 	--> Delete $($dFile.FullName)... " -ForegroundColor Yellow
+		Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": 	--> Delete $($dFile.FullName)... " -ForegroundColor Yellow
 		Remove-Item -Path ($dFile.FullName) -Force -ErrorAction SilentlyContinue
 	}
 
@@ -298,7 +302,7 @@ if ($qFileSizeBefore -ge $thresholdinGB)
 	Do
 	{
 		$service = Get-Service MSExchangeTransport
-		Write-Host (Get-Date) ": 	--> MSExchangeTransport Status $($service.Status)" -ForegroundColor Yellow
+		Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": 	--> MSExchangeTransport Status $($service.Status)" -ForegroundColor Yellow
 	}
 	While ($service.Status -ne 'Running')
 	
@@ -311,24 +315,25 @@ if ($qFileSizeBefore -ge $thresholdinGB)
     $htmlBody += $mailHeader
     $htmlBody += "<tr><th>Mail.Que Rebuild Summary</th></tr>"
     $htmlBody += "<tr><th>Mail.Que File</th><td>$($mailQFile)</td></tr>"
-    $htmlBody += "<tr><th>Size Before</th><td>$($qFileSizeBefore)</td></tr>"
-    $htmlBody += "<tr><th>Size After</th><td>$($qFileSizeAfter)</td></tr>"
+    $htmlBody += "<tr><th>Server</th><td>$($env:computername)</td></tr>"
+    $htmlBody += "<tr><th>Size Before</th><td>$($qFileSizeBefore) GB</td></tr>"
+    $htmlBody += "<tr><th>Size After</th><td>$($qFileSizeAfter) GB</td></tr>"
     $htmlBody += "<tr><th>Transport Service</th><td>$($service.Status)</td></tr>"
-    $htmlBody += "<tr><th>----END of REPORT----</th></tr>"
-    $htmlBody += "<p><font size=""2"" face=""Tahoma""><u>Report Paremeters</u><br />"
-    $htmlBody += "<p><font size=""2"" face=""Tahoma""><u>Report Paremeters</u><br />"
+    $htmlBody += "<tr><th>----END of REPORT----</th></tr></table>"
+    $htmlBody += "<p><font size=""2"" face=""Tahoma""><u>Report Paremeters</u><br /><br />"
     $htmlBody += "<b>[THRESHOLD]</b><br />"
-    $htmlBody += "Mail.Que Size Threshold: $($thresholdinGB) GB<br />"
+    $htmlBody += "Mail.Que Size Threshold: $($thresholdinGB) GB<br /><br />"
 	$htmlBody += "<b>[MAIL]</b><br />"
-    $htmlBody += "SMTP Server: $($smtpServer)<br /><br />"
-    $htmlBody += "SMTP Port: $($smtpPort)<br /><br />"
+    $htmlBody += "SMTP Server: $($smtpServer)<br />"
+    $htmlBody += "SMTP Port: $($smtpPort)<br /><br /><br />"
 	$htmlBody += "<b>[REPORT]</b><br />"
 	$htmlBody += "Generated from Server: $($env:computername)<br />"
-	$htmlBody += "Script File:$($MyInvocation.MyCommand.Definition)<br />"
+	$htmlBody += "Script File: $($MyInvocation.MyCommand.Definition)<br />"
 	$htmlBody += "</p><p>"
-	$htmlBody += "<a href=""$($scriptInfo.ProjectURI)"">$($scriptInfo.Name)</a> version $($scriptInfo.version)</p>"
+	$htmlBody += "<a href=""$($scriptInfo.ProjectURI)"">$($MyInvocation.MyCommand.Definition.ToString().Split("\")[-1]) $($scriptInfo.version)</a></p>"
     $htmlBody += "</html>"
     $htmlBody | Out-File $outputHTML
+    ($MyInvocation.MyCommand.Definition.ToString().Split("\")[-1])
 
     if ($sendEmail)
     {
@@ -359,12 +364,22 @@ if ($qFileSizeBefore -ge $thresholdinGB)
                 Attachments = $logFile
             }
         }
-
+        Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Sending email to" ($recipients -join ",") -ForegroundColor Green
         Send-MailMessage @mailParams
     }
 }
 else
 {
-	Write-Host (Get-Date) ": Mail.Que Size is less than $($t_MailQueSizeGB) GB. Exit script... " -ForegroundColor Green
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Mail.Que Size is less than $($t_MailQueSizeGB) GB. Exit script... " -ForegroundColor Green
 }
+
+#Invoke Housekeeping---------------------------------------------------------------------------------
+#if ($enableHousekeeping)
+if ($removeOldFiles)
+{
+	Write-Host (get-date -Format "dd-MMM-yyyy hh:mm:ss tt") ": Deleting files older than $($removeOldFiles) days" -ForegroundColor Yellow
+    Invoke-Housekeeping -folderPath $outputDirectory -daysToKeep $removeOldFiles    
+    if ($logDirectory) {Invoke-Housekeeping -folderPath $logDirectory -daysToKeep $removeOldFiles}
+}
+#-----------------------------------------------------------------------------------------------
 Stop-TxnLogging
